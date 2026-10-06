@@ -38,6 +38,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .0;
         println!("sample {sample}: probabilities {row:?}, selected class {class}");
     }
-    println!("See lessons/08-capstone.md for the GPU port exercise and checkpoints.");
+    println!("See lessons/08-capstone.md to trace the math, then lessons/12-gpu-classifier.md for complete GPU inference.");
     Ok(())
 }

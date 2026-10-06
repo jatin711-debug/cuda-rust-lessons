@@ -55,9 +55,10 @@ the answer: the program submits no reduction kernel.
 
 **Investigate:** lengths 16384 and 16385 change the pass graph from `[16384,128,1]`
 to `[16385,129,2,1]`. Explain why a single additional input can require another
-pass. Then implement a warp-shuffle reduction variant and compare synchronization,
-shared-memory traffic, register use, and event intervals. A partial warp requires
-correct participation masks; do not assume all 32 lanes are live.
+pass. Then read the supplied [warp reduction](10-warp-reduction.md) and compare
+synchronization, shared-memory traffic, work assignment, and event intervals.
+A partial physical warp requires correct participation masks; the supplied
+variant instead launches complete warps and zero-fills logical input tails.
 
 ## 2. Shared-memory transpose with padded bank layout
 
@@ -154,9 +155,9 @@ conclusion from a single event interval.
 
 ## Deeper follow-on work
 
-Use these examples as complete baselines for warp-level reduction, grid-stride
-work assignment, CUDA Graph replay to reduce submission gaps, and explicit
-cross-stream dependencies. Change one mechanism at a time and retain shape-edge
-cases and full reference comparisons. The classifier GPU port in
-[lesson 08](08-capstone.md) remains an application exercise; these examples supply
-concrete memory, synchronization, and measurement patterns for that work.
+Continue with supplied examples for [warp-level reduction](10-warp-reduction.md),
+[hierarchical prefix scan](11-hierarchical-scan.md), and a
+[complete GPU classifier](12-gpu-classifier.md). Change one mechanism at a time
+and retain shape-edge cases and full reference comparisons. The
+[continuing roadmap](ROADMAP.md) defines future projects for atomics, sorting,
+CUDA Graph replay, cross-stream dependencies, profiling, and attention.

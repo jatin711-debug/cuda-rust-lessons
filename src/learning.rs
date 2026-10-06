@@ -88,7 +88,105 @@ pub fn transpose(input: &[f32], rows: usize, cols: usize) -> Result<Vec<f32>, St
     Ok(output)
 }
 
-/// Shared bounded CLI for GPU SAXPY and pipeline experiments.
+/// Exclusive scan: output[i] is the sum of inputs before i.
+/// Require the full sum to fit u32, including block totals used by the GPU.
+pub fn exclusive_scan_u32(input: &[u32]) -> Result<Vec<u32>, String> {
+    let mut sum = 0u32;
+    let mut output = Vec::with_capacity(input.len());
+    for &value in input {
+        output.push(sum);
+        sum = sum.checked_add(value).ok_or("scan total exceeds u32")?;
+    }
+    Ok(output)
+}
+
+pub fn scan_inputs(len: usize) -> Vec<u32> {
+    (0..len).map(|i| (i % 7) as u32).collect()
+}
+
+pub const CLASSIFIER_FEATURES: usize = 23;
+pub const CLASSIFIER_HIDDEN: usize = 35;
+pub const CLASSIFIER_CLASSES: usize = 19;
+
+/// Deterministic inference inputs/weights; this is not a trained model.
+pub struct ClassifierProblem {
+    pub batch: usize,
+    pub input: Vec<f32>,
+    pub first_weights: Vec<f32>,
+    pub first_bias: Vec<f32>,
+    pub second_weights: Vec<f32>,
+    pub second_bias: Vec<f32>,
+}
+
+pub struct ClassifierReference {
+    pub hidden: Vec<f32>,
+    pub logits: Vec<f32>,
+    pub probabilities: Vec<f32>,
+}
+
+pub fn classifier_problem(batch: usize) -> Result<ClassifierProblem, String> {
+    if batch == 0 || batch > 1024 {
+        return Err("classifier batch must be in 1..=1024".into());
+    }
+    Ok(ClassifierProblem {
+        batch,
+        input: (0..batch * CLASSIFIER_FEATURES)
+            .map(|i| ((i * 7 % 29) as f32 - 14.0) * 0.0625)
+            .collect(),
+        first_weights: (0..CLASSIFIER_FEATURES * CLASSIFIER_HIDDEN)
+            .map(|i| ((i * 5 % 17) as f32 - 8.0) * 0.125)
+            .collect(),
+        first_bias: (0..CLASSIFIER_HIDDEN)
+            .map(|i| ((i % 7) as f32 - 3.0) * 0.0625)
+            .collect(),
+        second_weights: (0..CLASSIFIER_HIDDEN * CLASSIFIER_CLASSES)
+            .map(|i| (((i * 11 + (i / CLASSIFIER_CLASSES) * 3) % 19) as f32 - 9.0) * 0.0625)
+            .collect(),
+        second_bias: (0..CLASSIFIER_CLASSES)
+            .map(|i| (i as f32 - 9.0) * 0.03125)
+            .collect(),
+    })
+}
+
+pub fn classifier_reference(problem: &ClassifierProblem) -> Result<ClassifierReference, String> {
+    if problem.first_bias.len() != CLASSIFIER_HIDDEN
+        || problem.second_bias.len() != CLASSIFIER_CLASSES
+    {
+        return Err("classifier bias dimensions do not match the layers".into());
+    }
+    let mut hidden = super::matmul(
+        &problem.input,
+        &problem.first_weights,
+        problem.batch,
+        CLASSIFIER_FEATURES,
+        CLASSIFIER_HIDDEN,
+    )?;
+    for row in hidden.as_chunks_mut::<CLASSIFIER_HIDDEN>().0 {
+        for (value, &bias) in row.iter_mut().zip(&problem.first_bias) {
+            *value = (*value + bias).max(0.0);
+        }
+    }
+    let mut logits = super::matmul(
+        &hidden,
+        &problem.second_weights,
+        problem.batch,
+        CLASSIFIER_HIDDEN,
+        CLASSIFIER_CLASSES,
+    )?;
+    for row in logits.as_chunks_mut::<CLASSIFIER_CLASSES>().0 {
+        for (value, &bias) in row.iter_mut().zip(&problem.second_bias) {
+            *value += bias;
+        }
+    }
+    let probabilities = super::softmax_rows(&logits, problem.batch, CLASSIFIER_CLASSES)?;
+    Ok(ClassifierReference {
+        hidden,
+        logits,
+        probabilities,
+    })
+}
+
+/// Shared bounded CLI for vector GPU experiments.
 /// Bounds keep accidental allocations/repetition manageable on a laptop.
 #[derive(Debug, Clone, Copy)]
 pub struct ExperimentOptions {

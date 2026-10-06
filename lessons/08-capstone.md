@@ -10,7 +10,10 @@ cargo run --example classifier
 The supplied [classifier](../examples/classifier.rs) is a complete **CPU**
 walkthrough with hand-selected weights. It checks known hidden activations and
 logits, then validates stable softmax probabilities. It is not a trained model
-or a supplied GPU classifier; porting it is the final exercise.
+and serves as an arithmetic reference. After tracing these values, study the
+[complete GPU classifier](12-gpu-classifier.md), which uses larger, deliberately
+uneven dimensions and validates each layer. Both use deterministic lesson
+weights rather than a trained model.
 
 ## Follow the shapes and values
 
@@ -29,7 +32,7 @@ The matrix products reuse the root `matmul` reference; biases broadcast across
 rows, ReLU clamps negative hidden values to zero, and softmax normalizes each
 sample's scores. Output classes are zero-based indices of maximum probability.
 
-## Port in stages
+## Connect the computation to the GPU
 
 1. Build a correct baseline for a single matrix product, checking every output.
 2. Add a pointwise bias/ReLU kernel. Use `column = flat_index % hidden_width`
@@ -43,6 +46,12 @@ classes, so reusing it unchanged would violate its contract. Write a small
 shape-aware kernel or an explicitly padded variant. Padded softmax logits must
 exclude padded classes from the denominator; padding logits with zero is
 generally incorrect. This is different from zero-padding a matrix product.
+
+The supplied GPU application demonstrates this with 19 real classes and 32
+physical lanes: inactive lanes contribute negative infinity to the maximum
+and zero to the exponential sum. Read the implementation before trying a
+three-class port of the tiny example. Its diagnostic hidden/logit readbacks
+occur after timing; its five-kernel forward computation stays on the device.
 
 For the tiled matrix products, retain each tensor's real dimensions alongside
 its padded storage dimensions. Bias and activation kernels should handle the
@@ -61,3 +70,5 @@ and make each launcher contract match the chosen storage layout.
 After the baseline passes, try fusing bias/ReLU with the first product's output
 stage. Keep the unfused version as a comparison. The tiny default sizes teach
 correctness and ownership; scale the workload before investigating throughput.
+Use [lesson 12](12-gpu-classifier.md) for the supplied GPU baseline and
+[the continuing roadmap](ROADMAP.md) to choose a larger capstone.

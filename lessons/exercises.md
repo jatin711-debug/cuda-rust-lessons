@@ -22,23 +22,36 @@ bash scripts/run_gpu.sh all saxpy 127 2
 bash scripts/run_gpu.sh all saxpy 128 2
 bash scripts/run_gpu.sh all saxpy 129 2
 bash scripts/run_gpu.sh all pipeline 257 2
+bash scripts/run_gpu.sh oxide warp-reduction 16385 2
+bash scripts/run_gpu.sh oxide prefix-scan 16385 2
+bash scripts/run_gpu.sh oxide gpu-classifier 17 2
+bash scripts/verify_deep_core.sh
 ```
 
-SAXPY and pipeline accept length/repetition arguments. Other binaries retain
-their lesson's fixed data shape. The runner rejects extra arguments for those
-lessons instead of pretending that a shape changed.
+SAXPY, pipeline, both device reductions, prefix scan, and SAXPY events accept
+length/repetition arguments. Tiled transpose accepts rows/columns/repetitions;
+the GPU classifier accepts batch/repetitions. See the runner's `--help` and
+[README](../README.md) for bounds. Fixed-shape lessons reject extra arguments.
 
 ## Code exercises
 
 1. Change the SAXPY scalar in its CPU reference and GPU launch together. Predict
    the first result, then compare the entire output.
 2. Trace the multi-pass GPU reduction in [the advanced track](09-advanced-gpu.md),
-   then add a warp-shuffle variant with correct lane participation masks.
+   then inspect [the supplied warp variant](10-warp-reduction.md). Match the
+   original grid/pass geometry before isolating the effect of shuffles.
 3. Compare the supplied padded shared-memory SIMT transpose with an unpadded
    variant. Keep geometry and timing scope identical and inspect bank accesses.
 4. Fuse the two-stage pipeline. Algebra gives `x + 1.5*y`; arbitrary f32 inputs
    may round differently than the original intermediate-buffer computation.
-5. Port the classifier using the checkpoints in [lesson 08](08-capstone.md).
+5. Trace [the GPU classifier](12-gpu-classifier.md), then fuse its dense/bias
+   epilogues while preserving intermediate CPU checks.
+6. Replace the local [scan](11-hierarchical-scan.md) with a work-efficient tree,
+   preserving top-down offset propagation across three levels.
+7. Build stable compaction from keep flags, scan, and scatter. Verify order,
+   count, all-kept/all-dropped data, and a final partial block.
+8. Select a capstone and its correctness checkpoint from
+   [the continuing roadmap](ROADMAP.md).
 
 ## Explain these without running code
 
@@ -47,6 +60,9 @@ lessons instead of pretending that a shape changed.
 - Why is a block barrier insufficient for communication across an ordinary grid?
 - Why can safe ownership coexist with a mathematically incorrect kernel?
 - Why would transferring an intermediate back to the CPU slow a pipeline?
+- Why do 19 real softmax classes require masking both maximum and denominator?
+- Why must scan offsets propagate from the highest level downward?
 
 Answers are in [foundations](00-foundations.md), [reduction](05-parallel-reduction.md),
-[softmax](02-stable-softmax.md), and [streams](07-streams-and-timing.md).
+[softmax](02-stable-softmax.md), [streams](07-streams-and-timing.md),
+[hierarchical scan](11-hierarchical-scan.md), and [GPU classifier](12-gpu-classifier.md).

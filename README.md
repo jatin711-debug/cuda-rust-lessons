@@ -5,6 +5,11 @@ then read and run the GPU implementations side by side.
 If you know Rust and CUDA basics, start with the
 [advanced GPU track](lessons/09-advanced-gpu.md): device-only multi-pass reduction,
 a padded shared-memory transpose, and split-versus-fused CUDA event timing.
+Continue into [warp cooperation](lessons/10-warp-reduction.md),
+[hierarchical scan](lessons/11-hierarchical-scan.md), and a
+[complete GPU classifier](lessons/12-gpu-classifier.md). The
+[continuing roadmap](lessons/ROADMAP.md) specifies deeper projects through
+sorting, asynchronous execution, profiling, attention, and training.
 The examples use **the same input data and mathematical operation** in both libraries.
 Each GPU program copies its result back and checks **every element** against a CPU reference.
 
@@ -18,9 +23,18 @@ Each GPU program copies its result back and checks **every element** against a C
 | Hard | Multiply uneven rectangular matrices with data reuse | 2D blocks, cooperative loads, two barriers per tile, edge conditions | Matrix tiles, `mma`, specialization, zero padding |
 | Pipeline | Connect two kernels without an intermediate CPU round trip | Resident buffers, launch order, synchronized host timing | Operation ownership, device intermediates, end-to-end timing |
 
-There are **17 runnable GPU programs**: seven paired SIMT/Tile problems and three
-advanced oxide programs. The **ten learning chapters** include CPU labs and a
-CPU classifier capstone. The capstone's GPU port remains a guided exercise.
+There are **20 runnable GPU programs**: seven paired SIMT/Tile problems and six
+advanced oxide programs. The **thirteen learning chapters** include CPU labs,
+a hand-calculated classifier, and complete device inference.
+
+| Advanced oxide program | What it adds |
+| --- | --- |
+| `device-reduction` | All reduction passes on the GPU, separate pass buffers |
+| `tiled-transpose` | Cooperative global access and padded shared-memory layout |
+| `saxpy-events` | Matched split/fused variants with enabled CUDA timing events |
+| `warp-reduction` | Full-warp collectives, register accumulation, grid-stride work |
+| `prefix-scan` | Hierarchical block totals and top-down global offset propagation |
+| `gpu-classifier` | Five resident-buffer kernels, masked 19-class softmax, layer checks |
 
 These are learning kernels. The small matrix size makes it practical to inspect
 all results; it does not measure the GPU's peak performance.
@@ -66,8 +80,12 @@ GPU verification is recorded separately in [VERIFICATION.md](VERIFICATION.md).
 | 6 | [Transpose and memory access](lessons/06-transpose-and-memory.md) | `cargo run --example lab -- transpose 3 5` | `transpose` |
 | 7 | [Tiled matrix multiplication](lessons/03-tiled-matmul.md) | `cargo run --example walkthrough` | `hard-matmul` |
 | 8 | [Streams, ownership, and timing](lessons/07-streams-and-timing.md) | `cargo run --example lab -- pipeline 257` | `pipeline` |
-| 9 | [Classifier capstone and GPU port exercise](lessons/08-capstone.md) | `cargo run --example classifier` | Guided extension |
+| 9 | [Hand-calculated classifier capstone](lessons/08-capstone.md) | `cargo run --example classifier` | Preparation for device inference |
 | Advanced | [Multi-pass reduction, padded transpose, and event timing](lessons/09-advanced-gpu.md) | Trace indices and pass sizes in the chapter | `device-reduction`, `tiled-transpose`, `saxpy-events` (oxide) |
+| 10 | [Warp cooperation and grid-stride work](lessons/10-warp-reduction.md) | Predict lane participation and pass sizes | `warp-reduction` (oxide) |
+| 11 | [Hierarchical exclusive scan](lessons/11-hierarchical-scan.md) | Trace local prefixes and block offsets | `prefix-scan` (oxide) |
+| 12 | [Complete GPU classifier](lessons/12-gpu-classifier.md) | Reference in `src/learning.rs` | `gpu-classifier` (oxide) |
+| Further | [Projects toward expert-level GPU work](lessons/ROADMAP.md) | Derive references before new kernels | Future project specifications |
 
 The original lesson filenames stay stable; follow the order above rather than
 sorting filenames. Each paired core GPU lesson has a file with the same name in
@@ -178,16 +196,21 @@ bash scripts/run_gpu.sh oxide device-reduction 1048576 100
 bash scripts/run_gpu.sh oxide tiled-transpose 1024 1024 100
 bash scripts/run_gpu.sh oxide saxpy-events 1048576 100
 bash scripts/verify_advanced.sh
+bash scripts/run_gpu.sh oxide warp-reduction 1048576 100
+bash scripts/run_gpu.sh oxide prefix-scan 16385 2
+bash scripts/run_gpu.sh oxide gpu-classifier 17 2
+bash scripts/verify_deep_core.sh
 ```
 
 Each program returns an error on a failed comparison. The runner stops at the
 first failed command rather than displaying a success message for unverified work.
 
-`saxpy`, `pipeline`, `device-reduction`, and `saxpy-events` accept optional
-length/repetition arguments. Length
-is bounded to 1..=1048576 and repetitions to 1..=10000; other programs use the
-fixed lesson data. Advanced `tiled-transpose` accepts rows/columns/repetitions,
-up to 4096 per dimension and 4194304 total elements. The advanced programs are
+`saxpy`, `pipeline`, `device-reduction`, `saxpy-events`, `warp-reduction`, and
+`prefix-scan` accept optional length/repetition arguments. Length is bounded to
+1..=1048576 and repetitions to 1..=10000. Advanced `tiled-transpose` accepts
+rows/columns/repetitions, up to 4096 per dimension and 4194304 total elements.
+`gpu-classifier` accepts batch/repetitions, with batches in 1..=1024. The remaining
+programs use fixed lesson data. The advanced programs are
 oxide implementations; selecting `all` runs them on oxide alongside the paired
 core examples. SIMT SAXPY/pipeline time repeated resident-buffer launches with a final
 wait; Tile times repeated end-to-end chains including allocation and copies.
