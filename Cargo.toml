@@ -1,0 +1,11 @@
+[package]
+name = "cuda-rust-lessons"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+description = "Guided CUDA and Rust lessons with CPU labs and paired SIMT/Tile implementations"
+publish = false
+
+# This package deliberately has no GPU dependencies: the walkthrough works
+# on Windows and on machines without CUDA. Each GPU folder is its own project.
+[dependencies]

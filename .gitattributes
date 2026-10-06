@@ -1,0 +1,10 @@
+# Keep shell scripts portable to WSL/Linux even with Windows Git settings.
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
+*.md text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf

@@ -1,0 +1,13 @@
+[package]
+name = "tile-lessons"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+publish = false
+
+[workspace]
+
+[dependencies]
+cuda-rust-lessons = { path = "../.." }
+# Exact source revision: macro, compiler, and runtime evolve together.
+cutile = { git = "https://github.com/NVlabs/cutile-rs.git", rev = "cc720f182f38bf46527753caa340e78d6d5fa3cc" }
